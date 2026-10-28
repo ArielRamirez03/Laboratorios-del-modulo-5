@@ -1,0 +1,53 @@
+# PRACTICA 1 - RSYNC
+
+# AMBOS SERVIDORES
+hostname
+ip -4 addr show ens160
+sudo dnf install -y rsync openssh-server openssh-clients
+sudo systemctl enable --now sshd
+
+# SECUNDARIO - Firewall
+sudo firewall-cmd --add-service=ssh --permanent
+sudo firewall-cmd --reload
+
+# PRIMARIO - Crear archivos
+mkdir -p /home/arielrc/sincronizacion
+touch /home/arielrc/sincronizacion/archivo{1..100}.txt
+ls /home/arielrc/sincronizacion | wc -l
+
+# PRIMARIO - Conexion
+ping -c 4 10.0.0.37
+ssh arielramirez@10.0.0.37
+exit
+
+# PRIMARIO - Llaves SSH
+ssh-keygen -t ed25519
+ssh-copy-id arielramirez@10.0.0.37
+ssh arielramirez@10.0.0.37
+exit
+
+# PRIMARIO - Rsync
+rsync -avz /home/arielrc/sincronizacion/ arielramirez@10.0.0.37:/home/arielramirez/sincronizacion/
+
+# SECUNDARIO - Verificar
+ls /home/arielramirez/sincronizacion | wc -l
+
+# PRIMARIO - Script
+nano /home/arielrc/sync.sh
+chmod +x /home/arielrc/sync.sh
+/home/arielrc/sync.sh
+
+# PRIMARIO - Cron
+crontab -e
+sudo systemctl enable --now crond
+crontab -l
+
+# PRIMARIO - Archivo de prueba
+touch /home/arielrc/sincronizacion/prueba_cron.txt
+
+# SECUNDARIO - Verificacion final
+ls /home/arielramirez/sincronizacion/prueba_cron.txt
+ls /home/arielramirez/sincronizacion | wc -l
+
+# PRIMARIO - Registro
+cat /home/arielrc/sync.log

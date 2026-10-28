@@ -1,0 +1,112 @@
+
+# ==================================================
+# PRACTICA 2: CLUSTER DE ALTA DISPONIBILIDAD
+# PACEMAKER + COROSYNC - RED HAT ENTERPRISE LINUX 10
+# ==================================================
+
+# SERVIDOR 1: nodo1 - 10.0.0.36
+# SERVIDOR 2: nodo2 - 10.0.0.37 (VERIFICAR)
+# IP FLOTANTE: 10.0.0.100
+# RED: BRIDGE
+
+# 1. VERIFICAR IP (AMBOS SERVIDORES)
+ip -4 addr
+hostname
+
+# 2. CAMBIAR HOSTNAME (SERVIDOR 1)
+sudo hostnamectl set-hostname nodo1
+
+# 3. CAMBIAR HOSTNAME (SERVIDOR 2)
+sudo hostnamectl set-hostname nodo2
+
+# 4. CONFIGURAR HOSTS (AMBOS SERVIDORES)
+sudo nano /etc/hosts
+
+# AGREGAR LAS IP REALES:
+# 10.0.0.36 nodo1
+# 10.0.0.37 nodo2
+
+# 5. COMPROBAR CONECTIVIDAD
+ping -c 4 nodo1
+ping -c 4 nodo2
+
+# 6. HABILITAR REPOSITORIO HA (AMBOS)
+sudo subscription-manager repos --enable=rhel-10-for-x86_64-highavailability-rpms
+
+# 7. INSTALAR PAQUETES (AMBOS)
+sudo dnf install -y pcs pacemaker corosync resource-agents fence-agents-all
+
+# 8. CONFIGURAR CONTRASENA (AMBOS)
+sudo passwd hacluster
+
+# 9. HABILITAR PCSD (AMBOS)
+sudo systemctl enable --now pcsd
+
+# 10. CONFIGURAR FIREWALL (AMBOS)
+sudo firewall-cmd --permanent --add-service=high-availability
+sudo firewall-cmd --reload
+
+# 11. COMPROBAR SERVICIO
+sudo systemctl status pcsd
+
+# 12. AUTENTICAR NODOS (SERVIDOR 1)
+sudo pcs host auth nodo1 nodo2 -u hacluster
+
+# 13. CREAR CLUSTER (SERVIDOR 1)
+sudo pcs cluster setup clusterHA --start nodo1 nodo2
+
+# 14. HABILITAR CLUSTER
+sudo pcs cluster enable --all
+
+# 15. COMPROBAR CLUSTER
+sudo pcs status
+
+# 16. CORRECCION STONITH - SOLO LABORATORIO
+sudo pcs property set stonith-enabled=false
+sudo pcs property config --all | grep stonith-enabled
+
+# 17. CREAR IP FLOTANTE (SOLO SI NO EXISTE)
+sudo pcs resource create IP_Flotante ocf:heartbeat:IPaddr2 ip=10.0.0.100 cidr_netmask=24 op monitor interval=10s
+
+# 18. VERIFICAR RECURSO
+sudo pcs status
+sudo pcs resource status
+
+# 19. SI EL RECURSO EXISTE PERO ESTA STOPPED
+sudo pcs resource enable IP_Flotante
+sudo pcs resource cleanup IP_Flotante
+sudo pcs status
+
+# 20. COMPROBAR IP
+ip -4 addr
+ping -c 4 10.0.0.100
+
+# 21. PING CONTINUO DESDE WINDOWS CMD
+# ping -t 10.0.0.100
+
+# 22. VERIFICAR NODO ACTIVO
+sudo pcs status
+
+# 23. PASAR RECURSO DEL NODO1 AL NODO2
+sudo pcs node standby nodo1
+sudo pcs status
+
+# 24. REACTIVAR NODO1
+sudo pcs node unstandby nodo1
+
+# 25. PASAR RECURSO DEL NODO2 AL NODO1
+sudo pcs node standby nodo2
+sudo pcs status
+
+# 26. REACTIVAR NODO2
+sudo pcs node unstandby nodo2
+
+# 27. COMPROBACION FINAL
+sudo pcs status
+sudo pcs resource status
+ip -4 addr
+
+# NOTA: La migracion standby es una prueba
+# controlada y no sustituye el fencing para
+# un failover seguro ante fallos reales.
+  
